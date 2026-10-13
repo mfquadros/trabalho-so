@@ -13,6 +13,14 @@
 #define ESC_CIRCULAR        1      // Parte III: Round-Robin circular preemptivo
 #define ESC_PRIORIDADE      2      // Parte III: Prioridade dinâmica preemptiva
 
+#ifndef CONFIG_ESCALONADOR
+#define CONFIG_ESCALONADOR  ESC_CIRCULAR
+#endif
+
+#ifndef CONFIG_QUANTUM
+#define CONFIG_QUANTUM      QUANTUM_PADRAO
+#endif
+
 // Estados do Processo
 #define PROC_LIVRE          0
 #define PROC_PRONTO         1

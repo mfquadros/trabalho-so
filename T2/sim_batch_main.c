@@ -30,6 +30,7 @@ int main(int argc, char **argv)
 
     long max_inst = (argc >= 3) ? atol(argv[2]) : 2000000L;
     const char *entrada = (argc >= 4) ? argv[3] : NULL;
+    long atraso_entrada = (argc >= 5) ? atol(argv[4]) : 0;
 
     mem_t  *mem  = mem_cria();
     disp_t *disp = disp_cria(mem);
@@ -40,8 +41,8 @@ int main(int argc, char **argv)
     obj_carrega(argv[1], mem, &simbolos, erro, sizeof(erro));
     obj_libera_simbolos(simbolos);
 
-    /* injeta entrada no buffer do console antes de ligar a CPU */
-    if (entrada) {
+    /* injeta entrada imediatamente se nenhum atraso foi pedido */
+    if (entrada && atraso_entrada == 0) {
         for (const char *p = entrada; *p; p++)
             console_poe_entrada(disp, (unsigned char)*p);
         console_poe_entrada(disp, '\n');
@@ -53,6 +54,11 @@ int main(int argc, char **argv)
     int  ultimo_tam = 0;
 
     while (!cpu_parada(cpu) && passos < max_inst) {
+        if (entrada && atraso_entrada > 0 && passos == atraso_entrada) {
+            for (const char *p = entrada; *p; p++)
+                console_poe_entrada(disp, (unsigned char)*p);
+            console_poe_entrada(disp, '\n');
+        }
         cpu_executa_1(cpu);
         passos++;
 

@@ -1,5 +1,55 @@
 #include "so.h"
 
+// Biblioteca de saída para os processos de usuário (via syscall SO_ESCREVE)
+void so_print_str(char *s)
+{
+    while (*s != 0) {
+        so_escreve(*s);
+        s = s + 1;
+    }
+}
+
+void so_puts(char *s)
+{
+    so_print_str(s);
+    so_escreve(10);
+}
+
+void so_nova_linha(void)
+{
+    so_escreve(10);
+}
+
+void so_print_dec(int v)
+{
+    char buf[8];
+    int i;
+    int neg;
+
+    i = 0;
+    neg = 0;
+    if (v < 0) {
+        neg = 1;
+        v = -v;
+    }
+    if (v == 0) {
+        buf[0] = '0';
+        i = 1;
+    }
+    while (v > 0) {
+        buf[i] = (v % 10) + '0';
+        i = i + 1;
+        v = v / 10;
+    }
+    if (neg) {
+        so_escreve('-');
+    }
+    while (i > 0) {
+        i = i - 1;
+        so_escreve(buf[i]);
+    }
+}
+
 // Funções de atraso para simular processamento e gastar instruções
 void atraso_curto(void)
 {
@@ -95,6 +145,13 @@ void proc_init(void)
     so_print_dec(pid_b);
     so_nova_linha();
 
+    // Cria processo IO
+    so_puts("[INIT] Criando Processo IO...");
+    pid_io = so_cria_proc(proc_io);
+    so_print_str("[INIT] Processo IO PID: ");
+    so_print_dec(pid_io);
+    so_nova_linha();
+
     // Espera pelo processo A
     so_print_str("[INIT] Esperando PID ");
     so_print_dec(pid_a);
@@ -111,6 +168,15 @@ void proc_init(void)
     res = so_espera_proc(pid_b);
     so_print_str("[INIT] Retomado! PID ");
     so_print_dec(pid_b);
+    so_puts(" acabou.");
+
+    // Espera pelo processo IO
+    so_print_str("[INIT] Esperando PID ");
+    so_print_dec(pid_io);
+    so_puts("...");
+    res = so_espera_proc(pid_io);
+    so_print_str("[INIT] Retomado! PID ");
+    so_print_dec(pid_io);
     so_puts(" acabou.");
 
     // Teste de chamada com erro: tentar esperar por si mesmo

@@ -8,22 +8,11 @@
 ;
 ; Chamado por bios.asm/_start via "call _kernel_inicio" com sp em pilha_nucleo.
 _kernel_inicio:
-        ; 1. Programa o relógio para disparar a cada TICKS_POR_CLOCK instruções
-        ld      r0, TICKS_POR_CLOCK
-        ld      r1, r0
-        shr     r1, 8
-        outb    r1, (0x22)                  ; PORTA_RELOGIO_LIM_ALTO
-        outb    r0, (0x23)                  ; PORTA_RELOGIO_LIM_BAIXO
-
-        ; 2. Habilita interrupções de console (bit 0) e relógio (bit 2) -> 1 | 4 = 5
-        ld      r0, 5
-        outb    r0, (0x30)                  ; PORTA_CTRL_INTERRUPCOES
-
-        ; 3. Instala o escalonador no gancho do relógio da BIOS
+        ; 1. Instala o escalonador no gancho do relógio da BIOS
         ld      r0, escalonador_trampolim
         st      r0, (retomada_escalonador)
 
-        ; 4. Instala os handlers de chamada de sistema (tabela_syscalls[1..5])
+        ; 2. Instala os handlers de chamada de sistema (tabela_syscalls[1..5])
         ld      r1, syscall_trampolim
         ld      r0, tabela_syscalls
         add     r0, 2                       ; syscall 1: SO_LE
@@ -41,17 +30,27 @@ _kernel_inicio:
         add     r0, 10                      ; syscall 5: SO_ESPERA_PROC
         st      r1, (r0)
 
-        ; 5. Inicializa o SO em C (passa o endereço fixo onde o primeiro processo vai rodar)
+        ; 3. Inicializa o SO em C (passa o endereço fixo onde o primeiro processo vai rodar)
         ld      r0, pilha_sistema
         add     r0, -32
         push    r0
         call    _f_so_inicializa
         add     sp, 2
 
-        ; 6. Liga interrupções externas
-        ei
+        ; 4. Programa o relógio para disparar a cada TICKS_POR_CLOCK instruções
+        ld      r0, TICKS_POR_CLOCK
+        ld      r1, r0
+        shr     r1, 8
+        outb    r1, (0x22)                  ; PORTA_RELOGIO_LIM_ALTO
+        outb    r0, (0x23)                  ; PORTA_RELOGIO_LIM_BAIXO
 
-        ; 7. Primeiro "rete" manual: inicia o processo 0 (init) em modo usuário
+        ; 5. Habilita interrupções de console (bit 0) e relógio (bit 2) -> 1 | 4 = 5
+        ld      r0, 5
+        outb    r0, (0x30)                  ; PORTA_CTRL_INTERRUPCOES
+
+        ; 6. Primeiro "rete" manual: inicia o processo 0 (init) em modo usuário
+        ; O "rete" desempilha sr = 0x0000 (S=0, I=0, D=0), ligando interrupções
+        ; de forma limpa e atômica ao entrar no espaço de usuário.
         ld      sp, pilha_sistema
         add     sp, -32
         rete

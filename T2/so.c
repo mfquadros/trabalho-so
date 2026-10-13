@@ -187,6 +187,8 @@ int so_escolhe_proximo(void)
     int i;
     int melhor;
     int menor_prio;
+    int count;
+    int idx;
 
     if (escalonador_tipo == ESC_SIMPLES) {
         // Se o processo atual continua pronto, continua ele mesmo
@@ -215,15 +217,23 @@ int so_escolhe_proximo(void)
     } else if (escalonador_tipo == ESC_PRIORIDADE) {
         melhor = -1;
         menor_prio = 32767;
-        i = 0;
-        while (i < MAX_PROCESSOS) {
-            if (tab_processos[i].estado == PROC_PRONTO) {
-                if (tab_processos[i].prioridade < menor_prio) {
-                    menor_prio = tab_processos[i].prioridade;
-                    melhor = i;
+        count = 0;
+        idx = processo_atual + 1;
+        if (idx >= MAX_PROCESSOS || idx < 0) {
+            idx = 0;
+        }
+        while (count < MAX_PROCESSOS) {
+            if (tab_processos[idx].estado == PROC_PRONTO) {
+                if (tab_processos[idx].prioridade < menor_prio) {
+                    menor_prio = tab_processos[idx].prioridade;
+                    melhor = idx;
                 }
             }
-            i = i + 1;
+            idx = idx + 1;
+            if (idx >= MAX_PROCESSOS) {
+                idx = 0;
+            }
+            count = count + 1;
         }
         return melhor;
     }
@@ -290,6 +300,13 @@ void so_trata_pendencias(void)
             tab_processos[achou].quadro[0] = c; // r0 recebe o caractere lido
             tab_processos[achou].bloqueado_por = BLOQ_NENHUM;
             so_muda_estado(achou, PROC_PRONTO);
+            if (processo_atual == -1) {
+                processo_atual = so_escolhe_proximo();
+                if (processo_atual != -1) {
+                    so_muda_estado(processo_atual, PROC_EXECUTANDO);
+                    quantum_restante = quantum_config;
+                }
+            }
         } else {
             break; // Nenhum processo esperando console no momento
         }
@@ -581,9 +598,9 @@ void so_inicializa(int *quadro_boot)
     tempo_sistema = 0;
     processo_atual = -1;
 
-    // Configuração do escalonador: por padrão, circular
-    escalonador_tipo = ESC_CIRCULAR;
-    quantum_config = QUANTUM_PADRAO;
+    // Configuração do escalonador
+    escalonador_tipo = CONFIG_ESCALONADOR;
+    quantum_config = CONFIG_QUANTUM;
     quantum_restante = quantum_config;
 
     // Cria o primeiro processo do sistema (init)
@@ -598,9 +615,9 @@ void so_inicializa(int *quadro_boot)
     so_restaura_quadro(processo_atual, quadro_boot);
 }
 
-// ------------------------------------------------ Funções de Impressão e Relatório
+// ------------------------------------------------ Funções de Impressão do Kernel (para relatório)
 
-void so_print_str(char *s)
+void k_print_str(char *s)
 {
     while (*s != 0) {
         so_escreve_caractere(*s);
@@ -608,28 +625,28 @@ void so_print_str(char *s)
     }
 }
 
-void so_puts(char *s)
+void k_puts(char *s)
 {
-    so_print_str(s);
+    k_print_str(s);
     so_escreve_caractere(10);
 }
 
-void so_nova_linha(void)
+void k_nova_linha(void)
 {
     so_escreve_caractere(10);
 }
 
-void so_linha_igual(void)
+void k_linha_igual(void)
 {
-    so_puts("========================================");
+    k_puts("========================================");
 }
 
-void so_linha_traco(void)
+void k_linha_traco(void)
 {
-    so_puts("----------------------------------------");
+    k_puts("----------------------------------------");
 }
 
-void so_print_dec(int v)
+void k_print_dec(int v)
 {
     char buf[8];
     int i;
@@ -659,7 +676,7 @@ void so_print_dec(int v)
     }
 }
 
-void so_print_campo(int v, int largura)
+void k_print_campo(int v, int largura)
 {
     int temp;
     int digitos;
@@ -683,7 +700,7 @@ void so_print_campo(int v, int largura)
         so_escreve_caractere(' ');
         espacos = espacos - 1;
     }
-    so_print_dec(v);
+    k_print_dec(v);
 }
 
 void so_imprime_relatorio(void)
@@ -693,69 +710,65 @@ void so_imprime_relatorio(void)
     int retorno;
     int resp_med;
 
-    so_nova_linha();
-    so_linha_igual();
-    so_puts("  RELATORIO DE EXECUCAO DO SO");
-    so_linha_igual();
+    k_nova_linha();
+    k_linha_igual();
+    k_puts("  RELATORIO DE EXECUCAO DO SO");
+    k_linha_igual();
 
-    so_print_str("Escalonador: ");
+    k_print_str("Escalonador: ");
     if (escalonador_tipo == ESC_SIMPLES) {
-        so_puts("SIMPLES (Cooperativo)");
+        k_puts("SIMPLES (Cooperativo)");
     } else if (escalonador_tipo == ESC_CIRCULAR) {
-        so_puts("CIRCULAR (Round-Robin)");
+        k_puts("CIRCULAR (Round-Robin)");
     } else if (escalonador_tipo == ESC_PRIORIDADE) {
-        so_puts("PRIORIDADE DINAMICA");
+        k_puts("PRIORIDADE DINAMICA");
     }
 
-    so_print_str("Quantum: ");
-    so_print_dec(quantum_config);
-    so_print_str(" tiques (");
-    so_print_dec(quantum_config * TICKS_POR_CLOCK);
-    so_puts(" inst)");
+    k_print_str("Quantum: ");
+    k_print_dec(quantum_config);
+    k_print_str(" tiques (");
+    k_print_dec(quantum_config * TICKS_POR_CLOCK);
+    k_puts(" inst)");
 
-    so_linha_traco();
-    so_puts("METRICAS GERAIS DO SISTEMA:");
-    so_print_str("  Total proc criados: ");
-    so_print_dec(metricas.n_processos_criados);
-    so_nova_linha();
+    k_linha_traco();
+    k_puts("METRICAS GERAIS DO SISTEMA:");
+    k_print_str("  Total proc criados: ");
+    k_print_dec(metricas.n_processos_criados);
+    k_nova_linha();
 
-    so_print_str("  Tempo total exec:   ");
-    so_print_dec(metricas.tempo_total);
-    so_print_str(" tiques (~");
-    so_print_dec(metricas.tempo_total * TICKS_POR_CLOCK);
-    so_puts(" inst)");
+    k_print_str("  Tempo total exec:   ");
+    k_print_dec(metricas.tempo_total);
+    k_puts(" tiques de relogio");
 
-    so_print_str("  Tempo ocioso:       ");
-    so_print_dec(metricas.tempo_ocioso);
-    so_print_str(" tiques (~");
-    so_print_dec(metricas.tempo_ocioso * TICKS_POR_CLOCK);
-    so_puts(" inst)");
+    k_print_str("  Tempo ocioso:       ");
+    k_print_dec(metricas.tempo_ocioso);
+    k_puts(" tiques de relogio");
 
-    so_print_str("  Total preempcoes:   ");
-    so_print_dec(metricas.n_preempcoes_total);
-    so_nova_linha();
+    k_print_str("  Total preempcoes:   ");
+    k_print_dec(metricas.n_preempcoes_total);
+    k_nova_linha();
 
-    so_linha_traco();
-    so_puts("INTERRUPCOES RECEBIDAS:");
-    so_print_str("  [0]  Boot:         ");
-    so_print_dec(metricas.n_interrupcoes[0]);
-    so_nova_linha();
-    so_print_str("  [7]  Syscalls:     ");
-    so_print_dec(metricas.n_interrupcoes[7]);
-    so_nova_linha();
-    so_print_str("  [8]  Console:      ");
-    so_print_dec(metricas.n_interrupcoes[8]);
-    so_nova_linha();
-    so_print_str("  [10] Relogio:      ");
-    so_print_dec(metricas.n_interrupcoes[10]);
-    so_nova_linha();
+    k_linha_traco();
+    k_puts("INTERRUPCOES RECEBIDAS:");
+    k_print_str("  [0]  Boot:         ");
+    k_print_dec(metricas.n_interrupcoes[0]);
+    k_nova_linha();
+    k_print_str("  [7]  Syscalls:     ");
+    k_print_dec(metricas.n_interrupcoes[7]);
+    k_nova_linha();
+    k_print_str("  [8]  Console:      ");
+    k_print_dec(metricas.n_interrupcoes[8]);
+    k_nova_linha();
+    k_print_str("  [10] Relogio:      ");
+    k_print_dec(metricas.n_interrupcoes[10]);
+    k_nova_linha();
 
-    so_linha_traco();
-    so_puts("METRICAS POR PROCESSO:");
-    so_print_str("PID | Retorno | Preemp | Pronto(v/t) | ");
-    so_puts("Bloq(v/t) | Exec(v/t) | Resp.Med");
-    so_print_str("----+---------+--------+-------------+-");
-    so_puts("----------+-----------+---------");
+    k_linha_traco();
+    k_puts("METRICAS POR PROCESSO:");
+    k_print_str("PID | Retorno | Preemp | Pronto(v/t) | ");
+    k_puts("Bloq(v/t) | Exec(v/t) | Resp.Med");
+    k_print_str("----+---------+--------+-------------+-");
+    k_puts("----------+-----------+---------");
 
     i = 0;
     while (i < MAX_PROCESSOS) {
@@ -772,34 +785,34 @@ void so_imprime_relatorio(void)
             }
 
             so_escreve_caractere(' ');
-            so_print_campo(p->pid, 2);
-            so_print_str(" | ");
+            k_print_campo(p->pid, 2);
+            k_print_str(" | ");
 
-            so_print_campo(retorno, 7);
-            so_print_str(" | ");
+            k_print_campo(retorno, 7);
+            k_print_str(" | ");
 
-            so_print_campo(p->n_preempcoes, 6);
-            so_print_str(" | ");
+            k_print_campo(p->n_preempcoes, 6);
+            k_print_str(" | ");
 
-            so_print_campo(p->vezes_pronto, 4);
+            k_print_campo(p->vezes_pronto, 4);
             so_escreve_caractere('/');
-            so_print_campo(p->tempo_pronto, 7);
-            so_print_str(" | ");
+            k_print_campo(p->tempo_pronto, 7);
+            k_print_str(" | ");
 
-            so_print_campo(p->vezes_bloqueado, 3);
+            k_print_campo(p->vezes_bloqueado, 3);
             so_escreve_caractere('/');
-            so_print_campo(p->tempo_bloqueado, 7);
-            so_print_str(" | ");
+            k_print_campo(p->tempo_bloqueado, 7);
+            k_print_str(" | ");
 
-            so_print_campo(p->vezes_executando, 3);
+            k_print_campo(p->vezes_executando, 3);
             so_escreve_caractere('/');
-            so_print_campo(p->tempo_executando, 7);
-            so_print_str(" | ");
+            k_print_campo(p->tempo_executando, 7);
+            k_print_str(" | ");
 
-            so_print_campo(resp_med, 7);
-            so_nova_linha();
+            k_print_campo(resp_med, 7);
+            k_nova_linha();
         }
         i = i + 1;
     }
-    so_linha_igual();
+    k_linha_igual();
 }

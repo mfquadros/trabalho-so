@@ -34,7 +34,7 @@
 #define CONFIG_ESCALONADOR          ESC_CIRCULAR
 #endif
 
-#define TICKS_POR_CLOCK             1000    // Instruções por tique do relógio
+#define TICKS_POR_CLOCK             10000   // Instruções por tique do relógio
 #define QUANTUM_PADRAO              4       // Quantum = 4 tiques
 
 #ifndef CONFIG_QUANTUM
@@ -63,7 +63,7 @@
 #define CONFIG_MAX_QUADROS_USUARIO  8       // Padrão: 8 quadros
 #endif
 
-#define PRIMEIRO_QUADRO_USUARIO     160     // Quadros 0..159 reservados para SO e BIOS
+#define PRIMEIRO_QUADRO_USUARIO     56      // Quadros 0..55 reservados para SO e BIOS
 
 // Estados do Processo
 #define PROC_LIVRE                  0
@@ -110,6 +110,7 @@ struct ProgramaDisco {
 struct QuadroInfo {
     int ocupado;                    // 1 se em uso, 0 se livre
     int pid_dono;                   // PID do processo detentor
+    int proc_slot;                  // Slot do processo em tab_processos
     int pag_virtual;                // Página virtual associada
     int eh_dados;                   // 1 se página de dados, 0 se código
     int ordem_insercao;             // Sequencial para FIFO

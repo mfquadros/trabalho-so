@@ -35,7 +35,7 @@ void so_muda_estado(int proc_idx, int novo_estado);
 int  so_escolhe_proximo(void);
 void so_salva_quadro(int proc_idx, int *origem);
 void so_restaura_quadro(int proc_idx, int *destino);
-int  quadro_aloca(int pid, int pag_virtual, int eh_dados);
+int  quadro_aloca(int pid, int slot_proc, int pag_virtual, int eh_dados);
 void quadro_libera_todos(int pid);
 int  so_disco_le_bloco(int setor_linear, int endereco_fisico);
 int  so_disco_escreve_bloco(int setor_linear, int endereco_fisico);
@@ -192,6 +192,7 @@ void memoria_inicializa(void)
     while (i < CONFIG_MAX_QUADROS_USUARIO) {
         quadros_pool[i].ocupado = 0;
         quadros_pool[i].pid_dono = 0;
+        quadros_pool[i].proc_slot = -1;
         quadros_pool[i].pag_virtual = 0;
         quadros_pool[i].eh_dados = 0;
         quadros_pool[i].ordem_insercao = 0;
@@ -214,33 +215,37 @@ int procura_slot_por_pid(int pid)
 }
 
 // Escolhe quadro vítima de acordo com o algoritmo configurado (FIFO ou LRU)
+// Importante: apenas páginas de código são substituíveis (Parte II/III), pois
+// o hardware Mancha não registra o endereço em faltas de dados.
 int escolhe_quadro_vitima(void)
 {
     int i;
     int vitima;
     int menor_val;
 
-    vitima = 0;
+    vitima = -1;
+    menor_val = 0;
 
     if (CONFIG_SUBST_ALGO == SUBST_FIFO) {
-        menor_val = quadros_pool[0].ordem_insercao;
-        i = 1;
+        i = 0;
         while (i < CONFIG_MAX_QUADROS_USUARIO) {
-            if (quadros_pool[i].ordem_insercao < menor_val) {
-                menor_val = quadros_pool[i].ordem_insercao;
-                vitima = i;
+            if (quadros_pool[i].ocupado && quadros_pool[i].eh_dados == 0) {
+                if (vitima == -1 || quadros_pool[i].ordem_insercao < menor_val) {
+                    menor_val = quadros_pool[i].ordem_insercao;
+                    vitima = i;
+                }
             }
             i = i + 1;
         }
     } else {
         // SUBST_LRU (menor contador de envelhecimento)
-        menor_val = quadros_pool[0].idade;
-        i = 1;
+        i = 0;
         while (i < CONFIG_MAX_QUADROS_USUARIO) {
-            // Comparação de valor de envelhecimento (quanto menor, mais velho/menos acessado)
-            if (quadros_pool[i].idade < menor_val) {
-                menor_val = quadros_pool[i].idade;
-                vitima = i;
+            if (quadros_pool[i].ocupado && quadros_pool[i].eh_dados == 0) {
+                if (vitima == -1 || quadros_pool[i].idade < menor_val) {
+                    menor_val = quadros_pool[i].idade;
+                    vitima = i;
+                }
             }
             i = i + 1;
         }
@@ -249,7 +254,7 @@ int escolhe_quadro_vitima(void)
     return vitima;
 }
 
-int quadro_aloca(int pid, int pag_virtual, int eh_dados)
+int quadro_aloca(int pid, int slot_proc, int pag_virtual, int eh_dados)
 {
     int i;
     int slot_pool;
@@ -279,13 +284,16 @@ int quadro_aloca(int pid, int pag_virtual, int eh_dados)
     // 2. Se todos os quadros estiverem ocupados, executa substituição de página (Parte III)
     if (slot_pool == -1) {
         vitima = escolhe_quadro_vitima();
+        if (vitima == -1) {
+            return -1; // Nenhum quadro elegível para substituição
+        }
         slot_pool = vitima;
 
         pid_antigo = quadros_pool[vitima].pid_dono;
         pag_antiga = quadros_pool[vitima].pag_virtual;
-        slot_antigo = procura_slot_por_pid(pid_antigo);
+        slot_antigo = quadros_pool[vitima].proc_slot;
 
-        if (slot_antigo != -1) {
+        if (slot_antigo >= 0 && slot_antigo < MAX_PROCESSOS && tab_processos[slot_antigo].pid == pid_antigo) {
             if (quadros_pool[vitima].eh_dados) {
                 idx_tabela = PAGINA_DADOS_OFFSET + pag_antiga;
             } else {
@@ -316,6 +324,7 @@ int quadro_aloca(int pid, int pag_virtual, int eh_dados)
     contador_ordem_fifo = contador_ordem_fifo + 1;
     quadros_pool[slot_pool].ocupado = 1;
     quadros_pool[slot_pool].pid_dono = pid;
+    quadros_pool[slot_pool].proc_slot = slot_proc;
     quadros_pool[slot_pool].pag_virtual = pag_virtual;
     quadros_pool[slot_pool].eh_dados = eh_dados;
     quadros_pool[slot_pool].ordem_insercao = contador_ordem_fifo;
@@ -332,6 +341,7 @@ void quadro_libera_todos(int pid)
         if (quadros_pool[i].ocupado && quadros_pool[i].pid_dono == pid) {
             quadros_pool[i].ocupado = 0;
             quadros_pool[i].pid_dono = 0;
+            quadros_pool[i].proc_slot = -1;
             quadros_pool[i].pag_virtual = 0;
             quadros_pool[i].eh_dados = 0;
             quadros_pool[i].ordem_insercao = 0;
@@ -364,11 +374,21 @@ int so_cria_proc_interno(int prog_id)
     slot = -1;
     i = 0;
     while (i < MAX_PROCESSOS) {
-        if (tab_processos[i].estado == PROC_LIVRE || tab_processos[i].estado == PROC_MORTO) {
+        if (tab_processos[i].estado == PROC_LIVRE) {
             slot = i;
             break;
         }
         i = i + 1;
+    }
+    if (slot == -1) {
+        i = 0;
+        while (i < MAX_PROCESSOS) {
+            if (tab_processos[i].estado == PROC_MORTO) {
+                slot = i;
+                break;
+            }
+            i = i + 1;
+        }
     }
 
     if (slot == -1) {
@@ -394,19 +414,37 @@ int so_cria_proc_interno(int prog_id)
     }
 
     // Aloca quadro físico para dados/pilha (página virtual 0 de dados = entrada 128)
-    q_dados = quadro_aloca(p->pid, 0, 1);
+    q_dados = quadro_aloca(p->pid, slot, 0, 1);
+    if (q_dados == -1) {
+        p->estado = PROC_LIVRE;
+        return -1;
+    }
     p->quadro_dados = q_dados;
     p->tabela_paginas[PAGINA_DADOS_OFFSET] = ENTRADA_DADOS(q_dados);
 
+    // No teste de proteção: mapeia a página virtual 0 de dados para o código como somente leitura (tipo 1),
+    // e posiciona a pilha na página virtual 1 de dados (entrada 129, tipo 3).
+    // Assim, a escrita de prog_protecao em (int *) 0 atinge a página com tipo 1 e gera Int 1 (violação).
+    if (prog_id == PROG_PROTECAO) {
+        p->tabela_paginas[PAGINA_DADOS_OFFSET + 1] = ENTRADA_DADOS(q_dados);
+        p->quadro[6] = 1024; // sp no topo da página de dados 1
+    } else {
+        p->quadro[6] = 512;  // sp no topo da página de dados 0
+    }
+
     // Na Parte I (carga completa), aloca e carrega todo o código antecipadamente
-    if (CONFIG_DEMAND_PAGING == MODO_CARGA_COMPLETA) {
+    if (CONFIG_DEMAND_PAGING == MODO_CARGA_COMPLETA || prog_id == PROG_PROTECAO) {
         i = 0;
         while (i < p->n_paginas_codigo) {
-            q_cod = quadro_aloca(p->pid, i, 0);
+            q_cod = quadro_aloca(p->pid, slot, i, 0);
             setor_disco = prog->setor_inicial + i;
             end_fisico = q_cod * TAM_PAGINA;
             so_disco_le_bloco(setor_disco, end_fisico);
             p->tabela_paginas[i] = ENTRADA_CODIGO(q_cod);
+            if (prog_id == PROG_PROTECAO && i == 0) {
+                // Espelha código no endereço virtual 0 de dados como tipo 1 (somente leitura)
+                p->tabela_paginas[PAGINA_DADOS_OFFSET] = ENTRADA_CODIGO(q_cod);
+            }
             i = i + 1;
         }
     }
@@ -419,7 +457,11 @@ int so_cria_proc_interno(int prog_id)
         i = i + 1;
     }
 
-    p->quadro[6] = 512;                         // sp virtual: topo da página de dados
+    if (prog_id == PROG_PROTECAO) {
+        p->quadro[6] = 1024;
+    } else {
+        p->quadro[6] = 512;                         // sp virtual: topo da página de dados
+    }
     p->quadro[7] = 0;                           // ip virtual: início em 0
     p->quadro[8] = 0x4000;                      // sr: S=0, P=1, I=0, D=0 (modo usuário com paginação)
     p->quadro[12] = (int) p->tabela_paginas;    // s4 = pt (tabela de páginas)
@@ -517,16 +559,6 @@ int so_trata_pagina_ausente(int *quadro, int ip_falta)
     prog = &tabela_programas[p->prog_id];
     pag_virtual = (ip_falta >> 9) & 0x7F;
 
-    so_print_str("[DEBUG] Falha: pid=");
-    so_print_dec(p->pid);
-    so_print_str(" ip=");
-    so_print_dec(ip_falta);
-    so_print_str(" pag=");
-    so_print_dec(pag_virtual);
-    so_print_str(" n_pag=");
-    so_print_dec(p->n_paginas_codigo);
-    so_nova_linha();
-
     if (pag_virtual >= p->n_paginas_codigo) {
         so_puts("\n----------------------------------------");
         so_puts("[SO] EXCECAO: FALHA DE PAGINA ILEGAL!");
@@ -568,7 +600,19 @@ int so_trata_pagina_ausente(int *quadro, int ip_falta)
     p->faltas_pagina = p->faltas_pagina + 1;
 
     // Aloca um quadro livre (ou substitui pelo algoritmo FIFO/LRU)
-    q_fisico = quadro_aloca(p->pid, pag_virtual, 0);
+    q_fisico = quadro_aloca(p->pid, slot, pag_virtual, 0);
+    if (q_fisico == -1) {
+        so_puts("[SO] ERRO: Sem quadros fisicos para atender falta de pagina!");
+        so_salva_quadro(slot, quadro);
+        so_mata_proc_interno(slot);
+        processo_atual = so_escolhe_proximo();
+        if (processo_atual != -1) {
+            so_muda_estado(processo_atual, PROC_EXECUTANDO);
+            so_restaura_quadro(processo_atual, quadro);
+            quantum_restante = quantum_config;
+        }
+        return TROCOU_PROCESSO;
+    }
 
     // Carrega o setor do programa correspondente do disco diretamente para o quadro físico
     setor_disco = prog->setor_inicial + pag_virtual;
@@ -744,30 +788,32 @@ void so_tique_relogio(int *quadro)
     metricas.n_interrupcoes[10] = metricas.n_interrupcoes[10] + 1;
 
     // Atualização de Envelhecimento (Aging) para o algoritmo LRU (Parte III)
-    i = 0;
-    while (i < CONFIG_MAX_QUADROS_USUARIO) {
-        if (quadros_pool[i].ocupado) {
-            // Desloca idade 1 bit à direita
-            quadros_pool[i].idade = quadros_pool[i].idade >> 1;
+    if (CONFIG_SUBST_ALGO == SUBST_LRU) {
+        i = 0;
+        while (i < CONFIG_MAX_QUADROS_USUARIO) {
+            if (quadros_pool[i].ocupado) {
+                // Desloca idade 1 bit à direita
+                quadros_pool[i].idade = quadros_pool[i].idade >> 1;
 
-            slot_dono = procura_slot_por_pid(quadros_pool[i].pid_dono);
-            if (slot_dono != -1) {
-                if (quadros_pool[i].eh_dados) {
-                    idx_tabela = PAGINA_DADOS_OFFSET + quadros_pool[i].pag_virtual;
-                } else {
-                    idx_tabela = quadros_pool[i].pag_virtual;
-                }
-                val_entrada = tab_processos[slot_dono].tabela_paginas[idx_tabela];
+                slot_dono = quadros_pool[i].proc_slot;
+                if (slot_dono >= 0 && slot_dono < MAX_PROCESSOS && tab_processos[slot_dono].estado != PROC_LIVRE) {
+                    if (quadros_pool[i].eh_dados) {
+                        idx_tabela = PAGINA_DADOS_OFFSET + quadros_pool[i].pag_virtual;
+                    } else {
+                        idx_tabela = quadros_pool[i].pag_virtual;
+                    }
+                    val_entrada = tab_processos[slot_dono].tabela_paginas[idx_tabela];
 
-                // Verifica se a CPU ligou o bit de acesso (bit 13)
-                if (val_entrada & MASK_ACESSO) {
-                    quadros_pool[i].idade = quadros_pool[i].idade | 0x8000;
-                    // Zera o bit de acesso na entrada da tabela
-                    tab_processos[slot_dono].tabela_paginas[idx_tabela] = val_entrada & ~MASK_ACESSO;
+                    // Verifica se a CPU ligou o bit de acesso (bit 13)
+                    if (val_entrada & MASK_ACESSO) {
+                        quadros_pool[i].idade = quadros_pool[i].idade | 0x8000;
+                        // Zera o bit de acesso na entrada da tabela
+                        tab_processos[slot_dono].tabela_paginas[idx_tabela] = val_entrada & ~MASK_ACESSO;
+                    }
                 }
             }
+            i = i + 1;
         }
-        i = i + 1;
     }
 
     so_trata_pendencias();

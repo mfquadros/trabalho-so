@@ -63,33 +63,28 @@ int main(int argc, char **argv)
     cpu_liga(cpu);
 
     long passos = 0;
-    int ultimo_tam = 0;
 
     while (!cpu_parada(cpu) && passos < max_inst) {
         cpu_executa_1(cpu);
         passos++;
 
-        if (passos >= 17530 && passos <= 17560) {
-            fprintf(stderr, "[DEBUG EXEC] p=%ld ip=%04X sr=%04X sp=%04X evt=%s\n",
-                    passos, cpu_r(cpu, 7), cpu_sr(cpu), cpu_r(cpu, 6), cpu_ultimo_evento(cpu));
-        }
-
         // Exibe saida do console em tempo real
         int tam = 0;
         const char *saida = console_saida(disp, &tam);
-        if (tam > ultimo_tam) {
-            fwrite(saida + ultimo_tam, 1, (size_t)(tam - ultimo_tam), stdout);
+        if (tam > 0) {
+            fwrite(saida, 1, (size_t)tam, stdout);
             fflush(stdout);
-            ultimo_tam = tam;
+            console_limpa_saida(disp);
         }
     }
 
     // Esvazia buffer residual
     int tam = 0;
     const char *saida = console_saida(disp, &tam);
-    if (tam > ultimo_tam) {
-        fwrite(saida + ultimo_tam, 1, (size_t)(tam - ultimo_tam), stdout);
+    if (tam > 0) {
+        fwrite(saida, 1, (size_t)tam, stdout);
         fflush(stdout);
+        console_limpa_saida(disp);
     }
 
     fprintf(stderr, "\n[passos:%ld parado:%d ip:%04X evt:%s]\n",

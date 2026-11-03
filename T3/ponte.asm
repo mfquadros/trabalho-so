@@ -1,7 +1,7 @@
 ; ponte.asm -- Ponte de baixo nivel entre hardware/BIOS e kernel em C (T3)
 ; Gerencia inicializacao, trampolins de interrupcoes/excecoes e E/S de disco.
 
-        .equ    TICKS_POR_CLOCK = 1000
+        .equ    TICKS_POR_CLOCK = 10000
 
 ; ================================================================= Inicialização
 ;

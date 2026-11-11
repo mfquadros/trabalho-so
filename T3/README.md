@@ -243,13 +243,13 @@ Cada programa é compilado **sem `.org`**, assumindo endereço virtual 0. O `mob
 
 | Setor | Programa | Páginas | Descrição |
 |-------|----------|---------|-----------|
-| 0 | `prog_init` | 3 (1536 B) | Orquestrador: cria e aguarda todos os filhos |
+| 0–2 | `prog_init` | 3 (1536 B) | Orquestrador: cria e aguarda todos os filhos |
 | 3 | `prog_comp_a` | 1 (512 B) | Loop computacional com atraso (instanciado 2×) |
 | 4 | `prog_comp_b` | 1 (512 B) | Loop computacional menor |
 | 5 | `prog_io` | 1 (512 B) | Leitura de console e escrita |
-| 6–7 | `prog_multipage` | 2 (1024 B) | Teste com múltiplas páginas de código |
-| 8 | `prog_protecao` | 1 (512 B) | Teste de violação: escrita em página de código |
-| 9–24 | swap | 16 setores | Área de swap para write-back de páginas sujas |
+| 6–8 | `prog_multipage` | 3 (1536 B) | Teste com múltiplas páginas de código |
+| 9 | `prog_protecao` | 1 (512 B) | Teste de violação: escrita em página de código |
+| 10–25 | swap | 16 setores | Área de swap para write-back de páginas sujas |
 
 > **Nota**: Os setores iniciais de cada programa são registrados em `tabela_programas[]` dentro de `disco_inicializa_programas()`.
 
@@ -260,7 +260,7 @@ Cada programa é compilado **sem `.org`**, assumindo endereço virtual 0. O `mob
 | `prog_comp_a` (×2) | Mesmo binário em dois processos simultâneos, isolamento de dados |
 | `prog_comp_b` | Execução concorrente com quantum diferente |
 | `prog_io` | Bloqueio por I/O de console, desbloqueio por pendência |
-| `prog_multipage` | Código em 2 páginas, falta de página na fronteira de página |
+| `prog_multipage` | Código em 3 páginas, falta de página na fronteira entre páginas |
 | `prog_protecao` | Escrita em endereço virtual 0 (código) → Interrupção 1, processo terminado |
 
 ---
@@ -303,7 +303,7 @@ make run
 # 3. Executar em modo headless automatizado
 make batch
 
-# 4. Gerar relatório comparativo (requer gera_relatorio.py)
+# 4. Gerar relatório comparativo (executa matriz de 15 testes e gera RELATORIO.md)
 make report
 
 # 5. Limpar binários e intermediários
@@ -338,6 +338,8 @@ T3/
 ├── Makefile              # Build system: programas, disco, kernel, sim_batch
 ├── README.md             # Esta documentação completa
 ├── Instructions.md       # Especificação oficial do trabalho
+├── RELATORIO.md          # Relatório comparativo com matriz de testes (Parte III)
+├── gera_relatorio.py     # Script automatizado de geração de RELATORIO.md
 │
 ├── so.c                  # Núcleo do SO: paginação, gerenciamento de quadros,
 │                         #   substituição FIFO/LRU, escalonamento, métricas
@@ -350,7 +352,7 @@ T3/
 ├── prog_comp_a.c         # Computacional A: loop com atraso (duplicável)
 ├── prog_comp_b.c         # Computacional B: loop menor
 ├── prog_io.c             # Teste de I/O: leitura de console
-├── prog_multipage.c      # Teste multipágina: 4 fases em 2 páginas de código
+├── prog_multipage.c      # Teste multipágina: 4 fases em 3 páginas de código
 ├── prog_protecao.c       # Teste de proteção: escrita em código (provoca Int 1)
 │
 ├── u_lib.h               # Header da biblioteca de syscalls (modo usuário)
@@ -368,20 +370,29 @@ T3/
 
 ---
 
-## ⚠️ O que falta / Pontos de atenção
+## ✅ Status de Implementação e Validação
 
-1. **Script `gera_relatorio.py`**: O `Makefile` referencia `make report` que invoca `python3 gera_relatorio.py`, mas o script **ainda não existe** no diretório T3. É necessário criar um script que execute múltiplas configurações (FIFO × LRU, vários limites de quadros) e compare as métricas.
+Todas as funcionalidades exigidas nas **Partes I, II e III** das instruções foram implementadas e validadas:
 
-2. **Relatório `RELATORIO.md`**: Não foi gerado ainda. As instruções (Parte III) exigem um relatório comparando:
-   - FIFO vs LRU sob diferentes limites de quadros
-   - Número de faltas de página vs tempo de execução
-   - Determinação do limite mínimo de quadros que permite conclusão
+1. **Parte I — Carga Completa e Isolamento de Memória**:
+   - Compilação dos programas isoladamente a partir de endereço virtual 0.
+   - Configuração de tabela de páginas (entradas 0–127 código tipo 1, 128–255 dados tipo 3).
+   - Suporte a múltiplas instâncias concorrentes do mesmo executável (`prog_comp_a` instanciado 2 vezes com tabelas e dados separados).
+   - Proteção de memória validada via hardware: violação de escrita em código dispara Interrupção 1 e encerra o processo faltoso (`prog_protecao`).
 
-3. **Depuração do batch**: A execução com `make batch` (modo demanda, 8 quadros, LRU) não completa dentro do limite de 15M instruções. Possíveis causas:
-   - O limite de 8 quadros pode ser insuficiente para 7 processos simultâneos (init + 6 filhos, cada um com pelo menos 1 quadro de dados + 1 de código)
-   - Pode haver thrashing severo — aumentar `CONFIG_MAX_QUADROS_USUARIO` ou testar em modo carga completa primeiro
-   - Verificar se os setores iniciais em `disco_inicializa_programas()` estão corretos em relação ao layout real de `disco.img`
+2. **Parte II — Carregamento de Código por Demanda (Demand Paging)**:
+   - Handler da Interrupção 5 instalado no endereço físico 40 do vetor.
+   - Alocação inicial apenas da página de dados; páginas de código iniciam como tipo 0 (ausente).
+   - Distinção precisa entre faltas de código legítimas e acessos ilegais além do tamanho do binário.
+   - Carga transparente das páginas de código sob demanda a partir do disco e retomada via `rete`.
 
-4. **Validação de setores do disco**: O `prog_init` tem 3 páginas de código (1536 B) ocupando setores 0–2. Verificar se os setores de `prog_comp_a` (setor 1 no código) não colidem — a tabela `tabela_programas[]` deve ser validada contra o layout real do `disco.img`.
+3. **Parte III — Algoritmos de Substituição e Métricas**:
+   - Implementação completa dos algoritmos **FIFO** (ordem de alocação) e **LRU** (envelhecimento / aging de 16 bits periódico no relógio).
+   - Tratamento de páginas modificadas (tipo 3) com swap-out síncrono para o disco e descarte direto de páginas de código íntegras.
+   - Script automatizado `gera_relatorio.py` que executa uma matriz de 15 cenários de teste, variando algoritmos e restrição de memória.
+   - Relatório comparativo gerado em `RELATORIO.md` com análise de desempenho, taxas de falta e determinação do limite mínimo experimental de quadros.
 
-5. **Remoção de debug**: O `so_trata_pagina_ausente` e o `sim_batch_main.c` contêm prints de debug (`[DEBUG]`) que devem ser removidos na versão final.
+4. **Limpeza e Qualidade de Código**:
+   - Rastros de depuração (`[DEBUG]`) removidos do kernel e do runner batch.
+   - Compilação sem avisos ou erros.
+   - Execução padrão (`make batch`) conclui com sucesso com `[INIT] FIM` e imprime o relatório completo de métricas.

@@ -22,21 +22,21 @@ _f_main_comp_a:
 	add sp, 2
 	ld r0, 0
 	st r0, (bp+-2)
-_L134af5d8_4:
+_L28bc9072_4:
 	ld r0, (bp+-2)
 	push r0
 	ld r0, 5
 	ld r1, r0
 	pop r0
 	cmp r0, r1
-	jmpc lt, _L134af5d8_6
+	jmpc lt, _L28bc9072_6
 	ld r0, 0
-	jmp _L134af5d8_7
-_L134af5d8_6:
+	jmp _L28bc9072_7
+_L28bc9072_6:
 	ld r0, 1
-_L134af5d8_7:
+_L28bc9072_7:
 	cmp r0, 0
-	jmpc eq, _L134af5d8_5
+	jmpc eq, _L28bc9072_5
 	ld r0, 91
 	push r0
 	call _f_so_escreve
@@ -74,8 +74,8 @@ _L134af5d8_7:
 	pop r0
 	add r0, r1
 	st r0, (bp+-2)
-	jmp _L134af5d8_4
-_L134af5d8_5:
+	jmp _L28bc9072_4
+_L28bc9072_5:
 	ld r0, 10
 	push r0
 	call _f_so_escreve
@@ -93,21 +93,21 @@ _f_atraso_a:
 	sub sp, 2
 	ld r0, 0
 	st r0, (bp+-2)
-_L134af5d8_12:
+_L28bc9072_12:
 	ld r0, (bp+-2)
 	push r0
 	ld r0, 800
 	ld r1, r0
 	pop r0
 	cmp r0, r1
-	jmpc lt, _L134af5d8_14
+	jmpc lt, _L28bc9072_14
 	ld r0, 0
-	jmp _L134af5d8_15
-_L134af5d8_14:
+	jmp _L28bc9072_15
+_L28bc9072_14:
 	ld r0, 1
-_L134af5d8_15:
+_L28bc9072_15:
 	cmp r0, 0
-	jmpc eq, _L134af5d8_13
+	jmpc eq, _L28bc9072_13
 	ld r0, (bp+-2)
 	push r0
 	ld r0, 1
@@ -115,8 +115,8 @@ _L134af5d8_15:
 	pop r0
 	add r0, r1
 	st r0, (bp+-2)
-	jmp _L134af5d8_12
-_L134af5d8_13:
+	jmp _L28bc9072_12
+_L28bc9072_13:
 	ld sp, bp
 	pop bp
 	ret

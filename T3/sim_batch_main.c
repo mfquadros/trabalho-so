@@ -5,10 +5,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(__has_include)
+#if __has_include("../mancha-master/simulador_completo/src/cpu.h")
+#include "../mancha-master/simulador_completo/src/cpu.h"
+#include "../mancha-master/simulador_completo/src/dispositivos.h"
+#include "../mancha-master/simulador_completo/src/memoria.h"
+#include "../mancha-master/simulador_completo/src/objeto.h"
+#else
 #include "cpu.h"
 #include "dispositivos.h"
 #include "memoria.h"
 #include "objeto.h"
+#endif
+#else
+#include "cpu.h"
+#include "dispositivos.h"
+#include "memoria.h"
+#include "objeto.h"
+#endif
 
 int main(int argc, char **argv)
 {

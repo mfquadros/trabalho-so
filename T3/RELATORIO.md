@@ -22,9 +22,12 @@ A tabela abaixo resume os resultados obtidos com os 7 processos de teste executa
 
 | Cenário / Algoritmo | Quadros Usuário | Status | Faltas de Página | Substituições | Preempções | Tempo Total (tiques) | Instruções Simuladas |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Demanda - LRU - 7 Quadros (Abaixo do Mínimo) | 7 | **Concluiu** | 67 | 58 | 9 | 46 | 568,778 |
-| Demanda - LRU - 8 Quadros (Limite Mínimo) | 8 | **Concluiu** | 34 | 25 | 9 | 45 | 535,205 |
-| Demanda - FIFO - 8 Quadros (Limite Mínimo) | 8 | **Concluiu** | 21 | 12 | 7 | 37 | 459,368 |
+| Demanda - LRU - 4 Quadros | 4 | *Falhou (Sem Quadros)* | - | - | - | - | 15,000,000 |
+| Demanda - LRU - 5 Quadros | 5 | *Falhou (Sem Quadros)* | 51 | 50 | 7 | 30 | 373,484 |
+| Demanda - LRU - 6 Quadros | 6 | **Concluiu** | 47 | 37 | 8 | 45 | 535,170 |
+| Demanda - LRU - 7 Quadros | 7 | **Concluiu** | 67 | 58 | 9 | 46 | 568,778 |
+| Demanda - LRU - 8 Quadros | 8 | **Concluiu** | 34 | 25 | 9 | 45 | 535,205 |
+| Demanda - FIFO - 8 Quadros | 8 | **Concluiu** | 21 | 12 | 7 | 37 | 459,368 |
 | Demanda - LRU - 10 Quadros | 10 | **Concluiu** | 25 | 16 | 9 | 45 | 538,913 |
 | Demanda - FIFO - 10 Quadros | 10 | **Concluiu** | 19 | 10 | 7 | 38 | 460,537 |
 | Demanda - LRU - 12 Quadros | 12 | **Concluiu** | 20 | 11 | 9 | 46 | 543,083 |
@@ -41,11 +44,14 @@ A tabela abaixo resume os resultados obtidos com os 7 processos de teste executa
 
 Conforme solicitado explicitamente na **Parte III** das instruções, determinou-se experimentalmente o número mínimo de quadros de usuário que permite a conclusão de todos os processos de teste:
 
-- **Com 7 quadros**: A execução **falha** (`Sem quadros fisicos para atender falta de pagina`).
-  - *Explicação teórica*: Há 7 processos concorrentes (`Init` + 6 filhos). Como o hardware do Mancha não preserva o endereço virtual causador de faltas em acessos a dados, cada processo ativo requer **obrigatoriamente 1 quadro fixo de dados/pilha** residente em memória (7 quadros de dados no total). Com apenas 7 quadros disponíveis, todos os 7 quadros ficam retidos para as pilhas dos processos, restando **0 quadros para carregar qualquer instrução de código**.
-- **Com 8 quadros**: A execução **conclui com sucesso**.
-  - *Explicação teórica*: Os 7 quadros de dados ficam alocados aos processos ativos e **1 quadro de código** é continuamente compartilhado e alternado entre os processos via algoritmo de substituição de páginas (LRU ou FIFO).
-  - Este representa o **limite mínimo teórico e prático absoluto** para este conjunto de testes.
+- **Com 4 quadros**: A execução **falha** (thrashing: o sistema não avança além de 15M instruções simuladas).
+  - *Explicação*: Há 7 processos concorrentes. Cada um requer ao menos 1 quadro fixo de dados/pilha (insubstituível no hardware Mancha). Com apenas 4 quadros, é impossível sequer manter os dados de todos os processos — alguns jamais chegam a executar.
+- **Com 5 quadros**: A execução **falha** (para em ~373K passos, sem `[INIT] FIM`).
+  - *Explicação*: Com 5 quadros e 7 processos, os dados de todos não cabem simultaneamente. O processo `prog_io` termina cedo liberando 1 quadro, mas esse quadro é insuficiente: ainda faltam quadros para manter código e dados dos processos longevos concorrentes. O sistema entra em estado de impasse progressivo.
+- **Com 6 quadros**: A execução **conclui com sucesso** — este é o **limite mínimo experimental**.
+  - *Explicação*: `prog_io` e `prog_protecao` terminam prematuramente (IO ao ler do console, Proteção ao violar proteção de memória), liberando seus quadros de dados. Com 6 quadros disponíveis, há momentos com quadros suficientes para todos os processos restantes manterem dados e ao menos 1 quadro de código circular via substituição.
+- **Com 7 e 8 quadros**: A execução **conclui com sucesso** (7 quadros apresenta mais faltas que 8 devido a thrashing intermediário).
+- **Com 16+ quadros**: Substituições cessam (0 substituições) — o *working set* completo de código cabe na memória física.
 
 ---
 
@@ -103,7 +109,85 @@ Por outro lado, o **Carregamento por Demanda com Substituição** permite execut
 
 ## 7. Registros Detalhados das Execuções (Logs dos Relatórios do SO)
 
-### Demanda - LRU - 7 Quadros (Abaixo do Mínimo)
+### Demanda - LRU - 4 Quadros
+
+> Processo não concluiu normalmente (encerrado após 15,000,000 instruções com esgotamento de memória).
+
+### Demanda - LRU - 5 Quadros
+
+```
+======================================
+  RELATORIO DE EXECUCAO DO SO MANCHA (T3)
+========================================
+Modo Pag: Por Demanda (Partes II/III)
+Algoritmo Subst: LRU (Envelhecimento)
+Limite Quadros: 5 quadros
+Quantum: 4 tiques
+Tempo total exec: 30 tiques
+Tempo ocioso:     0 tiques
+Processos criados:5
+Total preempcoes: 7
+Faltas de Pagina: 51
+Substituicoes:    50
+Escritas Disco:   0
+----------------------------------------
+Contagem de Interrupcoes por Tipo:
+  [1] Protecao Seg:  0
+  [5] Falta Pagina:  51
+  [7] Syscalls:      155
+  [8] Console:       0
+  [10] Relogio:      30
+----------------------------------------
+Metricas Individuais por Processo:
+PID Prog   Ret  Preemp Faltas T.Pronto T.Exec
+--- ----   ---  ------ ------ -------- ------
+1   init    30    2      46      20      10
+2   proc_a    0    2      2      12      8
+3   proc_a    -1    2      2      15      8
+4   proc_b    -12    1      1      12      4
+5   proc_io    -29    0      0      0      0
+========================================
+```
+
+### Demanda - LRU - 6 Quadros
+
+```
+======================================
+  RELATORIO DE EXECUCAO DO SO MANCHA (T3)
+========================================
+Modo Pag: Por Demanda (Partes II/III)
+Algoritmo Subst: LRU (Envelhecimento)
+Limite Quadros: 6 quadros
+Quantum: 4 tiques
+Tempo total exec: 45 tiques
+Tempo ocioso:     0 tiques
+Processos criados:7
+Total preempcoes: 8
+Faltas de Pagina: 47
+Substituicoes:    37
+Escritas Disco:   0
+----------------------------------------
+Contagem de Interrupcoes por Tipo:
+  [1] Protecao Seg:  1
+  [5] Falta Pagina:  47
+  [7] Syscalls:      287
+  [8] Console:       0
+  [10] Relogio:      45
+----------------------------------------
+Metricas Individuais por Processo:
+PID Prog   Ret  Preemp Faltas T.Pronto T.Exec
+--- ----   ---  ------ ------ -------- ------
+1   init    45    3      35      29      16
+2   proc_a    36    2      3      26      10
+3   proc_a    37    2      3      27      10
+4   proc_b    27    1      2      22      5
+5   proc_io    13    0      1      12      1
+6   multi    9    0      3      6      3
+7   prot    2    0      0      2      0
+========================================
+```
+
+### Demanda - LRU - 7 Quadros
 
 ```
 ======================================
@@ -141,7 +225,7 @@ PID Prog   Ret  Preemp Faltas T.Pronto T.Exec
 ========================================
 ```
 
-### Demanda - LRU - 8 Quadros (Limite Mínimo)
+### Demanda - LRU - 8 Quadros
 
 ```
 ======================================
@@ -179,7 +263,7 @@ PID Prog   Ret  Preemp Faltas T.Pronto T.Exec
 ========================================
 ```
 
-### Demanda - FIFO - 8 Quadros (Limite Mínimo)
+### Demanda - FIFO - 8 Quadros
 
 ```
 ======================================

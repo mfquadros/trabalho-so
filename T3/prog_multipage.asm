@@ -94,21 +94,21 @@ _f_fase1:
 	st r0, (bp+-2)
 	ld r0, 0
 	st r0, (bp+-4)
-_L1345f5d8_4:
+_L28a59072_4:
 	ld r0, (bp+-4)
 	push r0
 	ld r0, 10
 	ld r1, r0
 	pop r0
 	cmp r0, r1
-	jmpc lt, _L1345f5d8_6
+	jmpc lt, _L28a59072_6
 	ld r0, 0
-	jmp _L1345f5d8_7
-_L1345f5d8_6:
+	jmp _L28a59072_7
+_L28a59072_6:
 	ld r0, 1
-_L1345f5d8_7:
+_L28a59072_7:
 	cmp r0, 0
-	jmpc eq, _L1345f5d8_5
+	jmpc eq, _L28a59072_5
 	ld r0, (bp+-2)
 	push r0
 	ld r0, (bp+-4)
@@ -123,8 +123,8 @@ _L1345f5d8_7:
 	pop r0
 	add r0, r1
 	st r0, (bp+-4)
-	jmp _L1345f5d8_4
-_L1345f5d8_5:
+	jmp _L28a59072_4
+_L28a59072_5:
 	ld sp, bp
 	pop bp
 	ret
@@ -160,21 +160,21 @@ _f_fase2:
 	st r0, (bp+-2)
 	ld r0, 0
 	st r0, (bp+-4)
-_L1345f5d8_12:
+_L28a59072_12:
 	ld r0, (bp+-4)
 	push r0
 	ld r0, 8
 	ld r1, r0
 	pop r0
 	cmp r0, r1
-	jmpc lt, _L1345f5d8_14
+	jmpc lt, _L28a59072_14
 	ld r0, 0
-	jmp _L1345f5d8_15
-_L1345f5d8_14:
+	jmp _L28a59072_15
+_L28a59072_14:
 	ld r0, 1
-_L1345f5d8_15:
+_L28a59072_15:
 	cmp r0, 0
-	jmpc eq, _L1345f5d8_13
+	jmpc eq, _L28a59072_13
 	ld r0, (bp+-2)
 	push r0
 	ld r0, (bp+-2)
@@ -189,8 +189,8 @@ _L1345f5d8_15:
 	pop r0
 	add r0, r1
 	st r0, (bp+-4)
-	jmp _L1345f5d8_12
-_L1345f5d8_13:
+	jmp _L28a59072_12
+_L28a59072_13:
 	ld sp, bp
 	pop bp
 	ret
@@ -226,21 +226,21 @@ _f_fase3:
 	st r0, (bp+-2)
 	ld r0, 0
 	st r0, (bp+-4)
-_L1345f5d8_20:
+_L28a59072_20:
 	ld r0, (bp+-4)
 	push r0
 	ld r0, 300
 	ld r1, r0
 	pop r0
 	cmp r0, r1
-	jmpc lt, _L1345f5d8_22
+	jmpc lt, _L28a59072_22
 	ld r0, 0
-	jmp _L1345f5d8_23
-_L1345f5d8_22:
+	jmp _L28a59072_23
+_L28a59072_22:
 	ld r0, 1
-_L1345f5d8_23:
+_L28a59072_23:
 	cmp r0, 0
-	jmpc eq, _L1345f5d8_21
+	jmpc eq, _L28a59072_21
 	ld r0, (bp+-2)
 	push r0
 	ld r0, 1
@@ -255,8 +255,8 @@ _L1345f5d8_23:
 	pop r0
 	add r0, r1
 	st r0, (bp+-4)
-	jmp _L1345f5d8_20
-_L1345f5d8_21:
+	jmp _L28a59072_20
+_L28a59072_21:
 	ld sp, bp
 	pop bp
 	ret
@@ -292,21 +292,21 @@ _f_fase4:
 	st r0, (bp+-4)
 	ld r0, 0
 	st r0, (bp+-2)
-_L1345f5d8_28:
+_L28a59072_28:
 	ld r0, (bp+-2)
 	push r0
 	ld r0, 10
 	ld r1, r0
 	pop r0
 	cmp r0, r1
-	jmpc lt, _L1345f5d8_30
+	jmpc lt, _L28a59072_30
 	ld r0, 0
-	jmp _L1345f5d8_31
-_L1345f5d8_30:
+	jmp _L28a59072_31
+_L28a59072_30:
 	ld r0, 1
-_L1345f5d8_31:
+_L28a59072_31:
 	cmp r0, 0
-	jmpc eq, _L1345f5d8_29
+	jmpc eq, _L28a59072_29
 	ld r0, (bp+-4)
 	push r0
 	ld r0, (bp+-2)
@@ -321,8 +321,8 @@ _L1345f5d8_31:
 	pop r0
 	add r0, r1
 	st r0, (bp+-2)
-	jmp _L1345f5d8_28
-_L1345f5d8_29:
+	jmp _L28a59072_28
+_L28a59072_29:
 	ld sp, bp
 	pop bp
 	ret

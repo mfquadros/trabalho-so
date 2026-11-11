@@ -464,7 +464,11 @@ int so_cria_proc_interno(int prog_id)
     }
     p->quadro[7] = 0;                           // ip virtual: início em 0
     p->quadro[8] = 0x4000;                      // sr: S=0, P=1, I=0, D=0 (modo usuário com paginação)
+#ifdef __clang__
+    p->quadro[12] = (int)(__INTPTR_TYPE__) p->tabela_paginas; // s4 = pt (tabela de páginas)
+#else
     p->quadro[12] = (int) p->tabela_paginas;    // s4 = pt (tabela de páginas)
+#endif
 
     // Métricas do processo
     p->faltas_pagina = 0;
